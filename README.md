@@ -25,7 +25,9 @@ idc-connectme "$(ip --oneline route get 1.1.1.1 | awk '{print $3'})"
 ```
 
 Or you can run it with a `NetworkManager` dispatcher script. Create a file at
-`/etc/NetworkManager/dispatcher.d/90-idc-connectme` with the following content:
+`/etc/NetworkManager/dispatcher.d/90-idc-connectme` with the following content
+(modified from
+[captive-portal.sh](https://github.com/Seme4eg/captive-portal-sh)):
 
 ```shell
 #!/bin/sh -e
