@@ -69,3 +69,11 @@ case "$2" in
   *) exit 0 ;;
 esac
 ```
+
+## Notes
+
+- I think it will probably only work on Wayland sessions (at least the
+  notifications and browser opening parts), but I haven't tested.
+
+- It won't work in most places, but please submit issues with the source of the
+  captive portal it broke on, so I can try to improve it.
