@@ -110,7 +110,7 @@ fn start_webdriver(port: usize) -> Result<Child> {
         .spawn()
         .map_err(|e| {
             anyhow!(
-                "Failed to start firefox. Make sure it is installed and in your PATH: {}",
+                "Failed to start chromedriver. Make sure it is installed and in your PATH: {}",
                 e
             )
         })
