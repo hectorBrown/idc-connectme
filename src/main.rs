@@ -3,14 +3,15 @@ use anyhow::anyhow;
 use clap::Parser;
 use fantoccini::{ClientBuilder, Locator};
 use notify_rust::Notification;
+use regex::Regex;
 use reqwest::Client as LightClient;
 use serde_json::json;
 use std::process::Stdio;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::time::{Duration, sleep};
 
 const SUBMIT_SELECTORS: &[&str] = &["input[type=\"submit\"]"];
-const WEBDRIVER_PORT: usize = 41211;
 const CONNECTIVITY_CHECK_URL: &str = "http://connectivitycheck.gstatic.com/generate_204";
 const CONNECTIVITY_TIMEOUT: usize = 5000;
 const CONNECTIVITY_REFRESH: usize = 500;
@@ -102,10 +103,9 @@ fn notify(summary: &str, body: &str, user: Option<String>) -> Result<()> {
     Ok(())
 }
 
-fn start_webdriver(port: usize) -> Result<Child> {
+fn start_webdriver() -> Result<Child> {
     Command::new("chromedriver")
         .arg("--headless")
-        .arg(format!("--port={}", port))
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|e| {
@@ -116,15 +116,41 @@ fn start_webdriver(port: usize) -> Result<Child> {
         })
 }
 
+async fn get_webdriver_port(webdriver_process: &mut Child) -> Result<usize> {
+    let stdout = webdriver_process
+        .stdout
+        .take()
+        .ok_or(anyhow!("Could not get stdout for webdriver_process"))?;
+    let mut reader = BufReader::new(stdout).lines();
+
+    while let Some(line) = reader.next_line().await? {
+        if let Some(port) = parse_port_from_line(&line)? {
+            return Ok(port);
+        }
+    }
+    Err(anyhow!("Could not find port from Webdriver process"))
+}
+
+fn parse_port_from_line(line: &str) -> Result<Option<usize>> {
+    let re = Regex::new(r"^ChromeDriver was started successfully on port (\d+)\.$")?;
+    if let Some(caps) = re.captures(line) {
+        return Ok(Some(
+            caps.get(1)
+                .ok_or(anyhow!("Couldn't extract port from line {}", line))?
+                .as_str()
+                .parse()?,
+        ));
+    } else {
+        Ok(None)
+    }
+}
+
 async fn autoconnect(captive_url: &str) -> Result<()> {
-    let mut webdriver_process = start_webdriver(WEBDRIVER_PORT)?;
-    println!("Started WebDriver on port {}", WEBDRIVER_PORT);
+    let mut webdriver_process = start_webdriver()?;
     let res = {
-        autoconnect_withdriver(
-            captive_url,
-            format!("http://localhost:{}", WEBDRIVER_PORT).as_str(),
-        )
-        .await
+        let port = get_webdriver_port(&mut webdriver_process).await?;
+        println!("Started WebDriver on port {}", port);
+        autoconnect_withdriver(captive_url, format!("http://localhost:{}", port).as_str()).await
     };
 
     webdriver_process.kill().await?;
