@@ -198,6 +198,8 @@ async fn autoconnect_withdriver(captive_url: &str, webdriver_address: &str) -> R
         }
     }
 
+    client.close().await?;
+
     for _ in 0..(CONNECTIVITY_TIMEOUT / CONNECTIVITY_REFRESH) {
         if check_connected().await? {
             return Ok(());
